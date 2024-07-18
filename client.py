@@ -3,6 +3,8 @@ import threading
 
 
 class Client:
+    host = 0
+
     def __init__(self, host='192.168.1.212', port=6531):
         self.host = host
         self.port = port
@@ -15,9 +17,15 @@ class Client:
         threading.Thread(target=self.send_command).start()
 
     def send_command(self):
-        commands = ["move 100 200", "click", "move 300 400", "scroll -10"]
+        commands = [
+            "move 100 200",
+            "click",
+            "move 300 400",
+            "scroll -10"
+        ]
+
         for command in commands:
-            self.client_socket.sendall(command.encode())
+            self.client_socket.sendall(command.encode('utf-8'))
 
     def receive_keys(self):
         try:

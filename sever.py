@@ -5,6 +5,7 @@ import pyautogui
 
 class Server:
     client_socket = 0
+    host = 0
 
     def __init__(self, host='192.168.1.212', port=6531):
         self.host = host
@@ -39,7 +40,11 @@ class Server:
         keyboard.wait('esc')
 
     def mouse(self):
-        def process_command(self, data):
+        while True:
+            data = self.server_socket.recv(1024).decode()
+            if not data:
+                break
+
             command = data.split()
             if command[0] == 'move':
                 x, y = int(command[1]), int(command[2])
