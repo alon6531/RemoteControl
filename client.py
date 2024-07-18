@@ -21,16 +21,22 @@ class Client:
         while True:
             command = self.client_socket.recv(1024).decode()
             parts = command.split()
-            if parts[0] == "MOVE":
+            if parts[0] == "MOUSE":
                 x, y = int(parts[1]), int(parts[2])
+                left_click = parts[3] == 'True'
+                right_click = parts[4] == 'True'
+
                 pyautogui.moveTo(x, y)
-            elif parts[0] == "CLICK":
-                button = parts[1].lower()
-                state = parts[2].lower()
-                if state == 'down':
-                    pyautogui.mouseDown(button=button)
-                elif state == 'up':
-                    pyautogui.mouseUp(button=button)
+
+                if left_click:
+                    pyautogui.mouseDown(button='left')
+                else:
+                    pyautogui.mouseUp(button='left')
+
+                if right_click:
+                    pyautogui.mouseDown(button='right')
+                else:
+                    pyautogui.mouseUp(button='right')
 
     def receive_keys(self):
         try:
