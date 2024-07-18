@@ -1,6 +1,6 @@
 import socket
 import threading
-
+import pyautogui
 
 class Client:
     host = 0
@@ -14,18 +14,14 @@ class Client:
         self.client_socket.connect((self.host, self.port))
         print(f'Connected to server at {self.host}:{self.port}')
         threading.Thread(target=self.receive_keys).start()
-        threading.Thread(target=self.send_command).start()
+        threading.Thread(target=self.handle_mouse).start()
 
-    def send_command(self):
-        commands = [
-            "move 100 200",
-            "click",
-            "move 300 400",
-            "scroll -10"
-        ]
-
-        for command in commands:
-            self.client_socket.sendall(command.encode('utf-8'))
+    def handle_mouse(self):
+        command = self.client_socket.recv(1024).decode()
+        parts = command.split()
+        if parts[0] == "MOVE":
+            x, y = int(parts[1]), int(parts[2])
+            pyautogui.moveTo(x, y)
 
     def receive_keys(self):
         try:

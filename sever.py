@@ -40,20 +40,10 @@ class Server:
         keyboard.wait('esc')
 
     def mouse(self):
-        while True:
-            data = self.server_socket.recv(1024).decode()
-            if not data:
-                break
-
-            command = data.split()
-            if command[0] == 'move':
-                x, y = int(command[1]), int(command[2])
-                pyautogui.moveTo(x, y)
-            elif command[0] == 'click':
-                pyautogui.click()
-            elif command[0] == 'scroll':
-                amount = int(command[1])
-                pyautogui.scroll(amount)
+        x, y = pyautogui.position()
+        message = f"MOVE {x} {y}"
+        self.client_socket.sendall(message.encode())
+        pyautogui.sleep(0.1)  # Capture mouse position every 0.1 seconds
 
     def handle(self):
         print("hellow")
