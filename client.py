@@ -2,6 +2,7 @@ import socket
 import threading
 import pyautogui
 
+
 class Client:
     host = 0
 
@@ -17,11 +18,19 @@ class Client:
         threading.Thread(target=self.handle_mouse).start()
 
     def handle_mouse(self):
-        command = self.client_socket.recv(1024).decode()
-        parts = command.split()
-        if parts[0] == "MOVE":
-            x, y = int(parts[1]), int(parts[2])
-            pyautogui.moveTo(x, y)
+        while True:
+            command = self.client_socket.recv(1024).decode()
+            parts = command.split()
+            if parts[0] == "MOVE":
+                x, y = int(parts[1]), int(parts[2])
+                pyautogui.moveTo(x, y)
+            elif parts[0] == "CLICK":
+                button = parts[1].lower()
+                state = parts[2].lower()
+                if state == 'down':
+                    pyautogui.mouseDown(button=button)
+                elif state == 'up':
+                    pyautogui.mouseUp(button=button)
 
     def receive_keys(self):
         try:
