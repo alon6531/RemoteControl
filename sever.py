@@ -1,33 +1,76 @@
+import pygame
 import socket
-import keyboard
 import threading
-import pyautogui
+import io
+from PIL import Image
+import keyboard
+
 
 class Server:
     client_socket = 0
-    host = 0
 
-    def __init__(self, host='192.168.1.212', port=6531):
-        self.host = host
-        self.port = port
-        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.connections = []
-        self.running = False
+    def __init__(self, host='0.0.0.0', port=12345, screen_size=(1920, 1080)):
 
-    def start(self):
-        self.server_socket.bind((self.host, self.port))
-        self.server_socket.listen(5)
-        print(f'Server listening on {self.host}:{self.port}')
-        self.running = True
+        def init_tcp_socket():
+            self.server_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_tcp_socket.bind((host, port))
+            self.server_tcp_socket.listen(5)
+            print(f'Server listening on {host}:{port}')
+
+        def init_udp_socket():
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.sock.bind((host, port))
+
+        def init_pygame():
+            pygame.init()
+            self.screen = pygame.display.set_mode(screen_size)
+
+        init_tcp_socket()
+
+        init_udp_socket()
+
+        init_pygame()
+
         self.accept_connections()
 
     def accept_connections(self):
-        while self.running:
-            self.client_socket, client_address = self.server_socket.accept()
-            self.connections.append(self.client_socket)
+        threading.Thread(target=self.display_image).start()
+        threading.Thread(target=self.keyboard).start()
+        while True:
+            self.client_socket, client_address = self.server_tcp_socket.accept()
             print(f'Connection from {client_address}')
-            threading.Thread(target=self.keyboard).start()
-            threading.Thread(target=self.mouse).start()
+
+    def display_image(self):
+        def receive_large_message():
+            data = bytearray()
+            while True:
+                chunk, _ = self.sock.recvfrom(65507)  # Adjust buffer size if necessary
+                if not chunk:
+                    break
+                data.extend(chunk)
+                # Simple heuristic to detect end of message; adjust if necessary
+                if len(chunk) < 65507:
+                    break
+            return bytes(data)
+
+        while True:
+            image_data = receive_large_message()
+            if image_data:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        raise SystemExit
+                try:
+                    # Open the image from the byte data
+                    image = Image.open(io.BytesIO(image_data))
+
+                    # Convert PIL image to Pygame surface
+                    pygame_image = pygame.image.fromstring(image.tobytes(), image.size, image.mode)
+
+                    # Display the image on the Pygame screen
+                    self.screen.blit(pygame_image, (0, 0))
+                    pygame.display.flip()
+                except Exception as e:
+                    print(f"Error displaying image: {e}")
 
     def keyboard(self):
         def on_key_event(event):
@@ -39,29 +82,6 @@ class Server:
         keyboard.on_press(on_key_event)
         keyboard.wait('esc')
 
-    def mouse(self):
-        while True:
-            left_click = pyautogui.mouseDown(button='left')
-            right_click = pyautogui.mouseDown(button='right')
-            message = f"MOUSE {x} {y} {left_click} {right_click}"
-            self.client_socket.sendall(message.encode())
-
-        pyautogui.sleep(1)  # Send commands at intervals
-
-    def handle(self):
-        print("hellow")
-
-    def stop(self):
-        self.running = False
-        for conn in self.connections:
-            conn.close()
-        self.server_socket.close()
 
 if __name__ == "__main__":
     server = Server()
-    try:
-        server.start()
-    except KeyboardInterrupt:
-        print("Server stopped by user.")
-    finally:
-        server.stop()
