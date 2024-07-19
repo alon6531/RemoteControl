@@ -1,57 +1,36 @@
-import threading
-
-import pygame
+import pickle
 import socket
-import io
+import struct
+
+import pyautogui
 from PIL import ImageGrab
+import io
+import threading
 
 
 class Client:
+    def __init__(self, server_ip='192.168.1.212', server_port=5000):
+        self.server_ip = server_ip
+        self.server_port = server_port
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((self.server_ip, self.server_port))
 
-    def __init__(self, host='192.168.1.212', port=12345, screen_size=(800, 600)):
+        self.client_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(f'Server listening on {server_ip}:{server_port}')
+        self.client_tcp_socket.connect((server_ip, server_port + 1))
+        print(f'Connected to server at {server_ip}:{server_port}')
 
-        def init_tcp_socket():
-            self.client_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            print(f'Server listening on {host}:{port}')
-            self.client_tcp_socket.connect((host, port))
-            print(f'Connected to server at {host}:{port}')
-
-        def init_udp_socket():
-            self.host = host
-            self.port = port
-            self.client_udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.MAX_UDP_SIZE = 65507  # Maximum UDP payload size
-
-        def init_pygame():
-            pygame.init()
-            self.screen = pygame.display.set_mode(screen_size)
-
-        init_tcp_socket()
-        init_udp_socket()
-        init_pygame()
-
-        threading.Thread(target=self.capture_screen).start()
         threading.Thread(target=self.receive_keys).start()
+        threading.Thread(target=self.mouse).start()
 
-    def capture_screen(self):
-        while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    raise SystemExit
-            # Capture the screen using Pillow
-            image = ImageGrab.grab()
+    def capture_and_send(self):
+        screen = ImageGrab.grab()
+        img_byte_arr = io.BytesIO()
+        screen.save(img_byte_arr, format='PNG')
+        img_data = img_byte_arr.getvalue()
 
-            # Convert image to bytes
-            byte_arr = io.BytesIO()
-            image.save(byte_arr, format='PNG')
-
-            def send_large_message(data):
-                # Split data into chunks and send
-                chunk_size = self.MAX_UDP_SIZE
-                for i in range(0, len(data), chunk_size):
-                    self.client_udp_socket.sendto(data[i:i + chunk_size], (self.host, self.port))
-
-            send_large_message(byte_arr.getvalue())
+        self.client_socket.sendall(len(img_data).to_bytes(4, 'big'))  # Send size first
+        self.client_socket.sendall(img_data)  # Then send the actual data
 
     def receive_keys(self):
         try:
@@ -66,8 +45,25 @@ class Client:
         finally:
             self.client_tcp_socket.close()
 
+    def mouse(self):
+        while True:
+            pos_x = self.client_tcp_socket.recv(8)
+            pos_y = self.client_tcp_socket.recv(8)
+            #pyautogui.sleep(5)
+            pyautogui.moveTo(pos_x, pos_y)
 
+    def run(self):
+        try:
+            while True:
+                self.capture_and_send()
 
+        except KeyboardInterrupt:
+            print("Client stopped.")
+        finally:
+            self.client_socket.close()
 
-if __name__ == "__main__":
+# Usage
+if __name__ == '__main__':
     client = Client()
+    client.run()
+

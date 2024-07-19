@@ -1,7 +1,11 @@
-import pygame
+import pickle
 import socket
+import struct
 import threading
-import io
+
+import pyautogui
+import pygame
+from io import BytesIO
 from PIL import Image
 import keyboard
 
@@ -9,68 +13,76 @@ import keyboard
 class Server:
     client_socket = 0
 
-    def __init__(self, host='192.168.1.212', port=12345, screen_size=(1920, 1080)):
+    def __init__(self, server_ip='192.168.1.212', server_port=5000):
+        pygame.init()
+        self.screen = pygame.display.set_mode((1920, 1080))
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((server_ip, server_port))
+        self.server_socket.listen(1)
+        self.conn, _ = self.server_socket.accept()
+        self.running = True
 
-        def init_tcp_socket():
-            self.server_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server_tcp_socket.bind((host, port))
-            self.server_tcp_socket.listen(5)
-            print(f'Server listening on {host}:{port}')
+        self.server_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_tcp_socket.bind((server_ip, server_port + 1))
+        self.server_tcp_socket.listen(5)
+        print(f'Server listening on {server_ip}:{server_port}')
+        self.client_socket, client_address = self.server_tcp_socket.accept()
 
-        def init_udp_socket():
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.sock.bind((host, port))
-
-        def init_pygame():
-            pygame.init()
-            self.screen = pygame.display.set_mode(screen_size)
-
-        init_tcp_socket()
-
-        init_udp_socket()
-
-        init_pygame()
-
-        self.accept_connections()
-
-    def accept_connections(self):
-        threading.Thread(target=self.display_image).start()
         threading.Thread(target=self.keyboard).start()
+        threading.Thread(target=self.mouse).start()
+
+    def receive_image(self):
+        try:
+            # Receive size of the image data
+            img_size_data = self.conn.recv(4)
+            if not img_size_data:
+                return False
+            img_size = int.from_bytes(img_size_data, 'big')
+
+            # Receive the image data
+            img_data = b''
+            while len(img_data) < img_size:
+                packet = self.conn.recv(img_size - len(img_data))
+                if not packet:
+                    return False
+                img_data += packet
+
+            # Process image data
+            img = Image.open(BytesIO(img_data))
+            img = img.convert('RGB')
+            mode = 'RGB'  # Ensuring the mode is 'RGB' for pygame
+            size = img.size
+            data = img.tobytes()
+
+            # Display image in Pygame
+            pygame_surface = pygame.image.fromstring(data, size, mode)
+            self.screen.blit(pygame_surface, (0, 0))
+            pygame.display.flip()
+            return True
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return False
+
+    def run(self):
+        while self.running:
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+
+            if not self.receive_image():
+                self.running = False
+
+        pygame.quit()
+        self.server_socket.close()
+
+    def mouse(self):
         while True:
-            self.client_socket, client_address = self.server_tcp_socket.accept()
-            print(f'Connection from {client_address}')
-
-    def display_image(self):
-        def receive_large_message():
-            data = bytearray()
-            while True:
-                chunk, _ = self.sock.recvfrom(65507)  # Adjust buffer size if necessary
-                if not chunk:
-                    break
-                data.extend(chunk)
-                # Simple heuristic to detect end of message; adjust if necessary
-                if len(chunk) < 65507:
-                    break
-            return bytes(data)
-
-        while True:
-            image_data = receive_large_message()
-            if image_data:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        raise SystemExit
-                try:
-                    # Open the image from the byte data
-                    image = Image.open(io.BytesIO(image_data))
-
-                    # Convert PIL image to Pygame surface
-                    pygame_image = pygame.image.fromstring(image.tobytes(), image.size, image.mode)
-
-                    # Display the image on the Pygame screen
-                    self.screen.blit(pygame_image, (0, 0))
-                    pygame.display.flip()
-                except Exception as e:
-                    print(f"Error displaying image: {e}")
+            mouse_pos_x = pyautogui.position().x
+            self.client_socket.send(str(mouse_pos_x).encode())
+            mouse_pos_y = pyautogui.position().y
+            self.client_socket.send(str(mouse_pos_y).encode())
 
     def keyboard(self):
         def on_key_event(event):
@@ -81,7 +93,7 @@ class Server:
         print("Press ESC to stop capturing keys.")
         keyboard.on_press(on_key_event)
         keyboard.wait('esc')
-
-
-if __name__ == "__main__":
-    server = Server()
+# Usage
+if __name__ == '__main__':
+    receiver = Server()
+    receiver.run()
