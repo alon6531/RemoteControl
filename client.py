@@ -1,7 +1,7 @@
 import pickle
 import socket
 import struct
-
+import keyboard
 import pyautogui
 from PIL import ImageGrab
 import io
@@ -21,7 +21,7 @@ class Client:
         print(f'Connected to server at {server_ip}:{server_port}')
 
         threading.Thread(target=self.receive_keys).start()
-        threading.Thread(target=self.mouse).start()
+        #threading.Thread(target=self.mouse).start()
 
     def capture_and_send(self):
         screen = ImageGrab.grab()
@@ -38,6 +38,7 @@ class Client:
                 data = self.client_tcp_socket.recv(1024)
                 if data:
                     print(f'Received key: {data.decode()}')
+                    keyboard.press(data.decode())
                 else:
                     break
         except ConnectionError:
@@ -66,4 +67,3 @@ class Client:
 if __name__ == '__main__':
     client = Client()
     client.run()
-
