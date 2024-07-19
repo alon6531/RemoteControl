@@ -9,7 +9,7 @@ import keyboard
 class Server:
     client_socket = 0
 
-    def __init__(self, host='0.0.0.0', port=12345, screen_size=(1920, 1080)):
+    def __init__(self, host='192.168.1.212', port=12345, screen_size=(1920, 1080)):
 
         def init_tcp_socket():
             self.server_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

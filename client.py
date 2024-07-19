@@ -8,7 +8,7 @@ from PIL import ImageGrab
 
 class Client:
 
-    def __init__(self, host='127.0.0.1', port=12345, screen_size=(800, 600)):
+    def __init__(self, host='192.168.1.212', port=12345, screen_size=(800, 600)):
 
         def init_tcp_socket():
             self.client_tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
